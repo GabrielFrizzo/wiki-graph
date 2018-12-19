@@ -5,34 +5,39 @@ from networkx.drawing.nx_pydot import write_dot
 from bs4 import BeautifulSoup
 from re import match
 
-def find_link(soup):
+BASE_LINK = 'https://en.wikipedia.org'
+
+def valid_link(link):
+	if match('/wiki/[A-Za-z0-9\(\)_]*$', link) is not None:
+		return True
+	return False
+
+def find_links(current_page):
+	with request.urlopen(BASE_LINK + current_page) as response:
+		html = response.read()
+	soup = BeautifulSoup(html, 'html.parser')
+
 	for paragraph in soup.find(id='mw-content-text').find_all('p'):
-		for link in paragraph.find_all('a'):
-			href = link.get('href')
-			if match('/wiki/[A-Za-z0-9\(\)_]*$', href) is not None:
-				return href
+		return [link for link in paragraph.find_all('a') if valid_link(link)]
 
 def page_label(page):
 	return page[6:]
 
+def add_page(depth, curr_page, prev_page = None):
+	G.add_node(page_label(curr_page))
+	if prev_page is not None:
+		G.add_edge(page_label(prev_page), page_label(curr_page))
+
+	if depth > 0:
+		for next_page in find_links(curr_page):
+			print(curr_page, next_page)
+			add_page(depth-1, next_page, curr_page) 
+
+
 def populate_graph():
-	base_link = 'https://en.wikipedia.org'
-	next_page = '/wiki/Freddie_Mercury'
-	prev_page = None
+	first_page = '/wiki/Freddie_Mercury'
 
-	while next_page is not None and page_label(next_page) not in G.nodes:
-		G.add_node(page_label(next_page))
-		if prev_page is not None:
-			G.add_edge(page_label(prev_page), page_label(next_page)) 
-		with request.urlopen(base_link + next_page) as response:
-			html = response.read()
-		soup = BeautifulSoup(html, 'html.parser')
-
-		prev_page = next_page
-		next_page = find_link(soup)
-		print(next_page)
-	
-	G.add_edge(page_label(prev_page), page_label(next_page))
+	add_page(1, first_page)
 
 G = nx.DiGraph()
 
